@@ -3,22 +3,23 @@ import { cookies } from "next/headers";
 
 function getSupabaseConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const supabasePublishableKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
+  if (!supabaseUrl || !supabasePublishableKey) {
     throw new Error(
       "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
     );
   }
 
-  return { supabaseUrl, supabaseKey };
+  return { supabaseUrl, supabasePublishableKey };
 }
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const { supabaseUrl, supabaseKey } = getSupabaseConfig();
+  const { supabaseUrl, supabasePublishableKey } = getSupabaseConfig();
 
-  return createServerClient(supabaseUrl, supabaseKey, {
+  return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
