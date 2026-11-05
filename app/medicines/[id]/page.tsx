@@ -1,4 +1,5 @@
 import { PharmacyResults, type PharmacyResult } from "@/components/medicines/PharmacyResults";
+import { PharmacyMap } from "@/components/map/PharmacyMap";
 import { Footer } from "@/components/landing/Footer";
 import { Navbar } from "@/components/landing/Navbar";
 import { getStockStatus, type StockBatch } from "@/lib/stock";
@@ -145,8 +146,11 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
           {medicine.description ? <p className="mt-6 max-w-2xl text-ink-600">{medicine.description}</p> : null}
         </section>
 
-        <div className="mt-12">
+        <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:items-start">
           <PharmacyResults pharmacies={pharmacies} />
+          <aside className="lg:sticky lg:top-6" aria-label="Pharmacy map">
+            <PharmacyMap pharmacies={pharmacies} />
+          </aside>
         </div>
 
         {(alternativesData ?? []).length > 0 ? (
