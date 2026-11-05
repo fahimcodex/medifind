@@ -23,10 +23,10 @@ export function Hero() {
         <span className="inline-flex rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-ink-600 shadow-sm">Trusted medicine availability, near you</span>
         <h1 className="mx-auto mt-7 max-w-[760px] text-4xl font-bold leading-[1.12] tracking-[-0.045em] text-ink-900 sm:text-5xl lg:text-[56px]">Find the medicine you need at a pharmacy near you</h1>
         <p className="mx-auto mt-6 max-w-[630px] text-base leading-7 text-ink-600 sm:text-lg">Search by brand or generic name, compare nearby pharmacies by stock and distance, and reserve your medicine for pickup — all in one place.</p>
-        <form className="mx-auto mt-10 grid max-w-[780px] gap-3 rounded-2xl bg-white p-3 text-left shadow-lg sm:grid-cols-[1fr_0.85fr_auto]">
+        <form action="/search" method="get" className="mx-auto mt-10 grid max-w-[780px] gap-3 rounded-2xl bg-white p-3 text-left shadow-lg sm:grid-cols-[1fr_0.85fr_auto]">
           <label className="flex items-center gap-3 rounded-xl border border-line px-4 py-3 text-sm text-ink-400 focus-within:border-primary-600">
             <SearchIcon />
-            <input className="min-w-0 flex-1 bg-transparent text-ink-900 outline-none placeholder:text-ink-400" placeholder="Search a medicine" />
+            <input name="q" className="min-w-0 flex-1 bg-transparent text-ink-900 outline-none placeholder:text-ink-400" placeholder="Search a medicine" />
           </label>
           <label className="flex items-center gap-3 rounded-xl border border-line px-4 py-3 text-sm text-ink-400 focus-within:border-primary-600">
             <LocationIcon />
