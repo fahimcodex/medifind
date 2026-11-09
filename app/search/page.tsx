@@ -1,8 +1,10 @@
 import { Footer } from "@/components/landing/Footer";
 import { Navbar } from "@/components/landing/Navbar";
+import { FilterSidebar } from "@/components/search/FilterSidebar";
+import { MedicineCard } from "@/components/search/MedicineCard";
 import { SearchBar } from "@/components/search/SearchBar";
+import { getStockStatus, type StockBatch } from "@/lib/stock";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 
 type Medicine = {
   id: string;
@@ -17,75 +19,124 @@ type SearchPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
+type InventoryRow = StockBatch & {
+  medicine_id: string;
+  pharmacy_id: string;
+  pharmacies: { id: string; status: string } | { id: string; status: string }[] | null;
+};
+
+function getParam(params: SearchPageProps["searchParams"] extends Promise<infer T> ? T : never, key: string) {
+  const value = params[key];
+  return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
-  const queryParam = params.q;
-  const query = (Array.isArray(queryParam) ? queryParam[0] : queryParam)?.trim() ?? "";
+  const query = getParam(params, "q");
+  const selectedForm = getParam(params, "form");
+  const selectedCategory = getParam(params, "category");
   let medicines: Medicine[] = [];
+  let formOptions: { label: string; count: number }[] = [];
+  let categoryOptions: { label: string; count: number }[] = [];
+  const availability = new Map<string, { pharmacyCount: number; stockCount: number }>();
 
   if (query) {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let medicineQuery = supabase
       .from("medicines")
       .select("id, brand_name, generic_name, strength, form, category")
       .or(`brand_name.ilike.%${query}%,generic_name.ilike.%${query}%`)
       .order("brand_name");
 
-    if (error) {
-      throw new Error("Unable to search medicines.", { cause: error });
-    }
+    if (selectedForm) medicineQuery = medicineQuery.eq("form", selectedForm);
+    if (selectedCategory) medicineQuery = medicineQuery.eq("category", selectedCategory);
 
+    const { data, error } = await medicineQuery;
+    if (error) throw new Error("Unable to search medicines.", { cause: error });
     medicines = (data ?? []) as Medicine[];
+
+    const { data: filterData, error: filterError } = await supabase
+      .from("medicines")
+      .select("form, category")
+      .or(`brand_name.ilike.%${query}%,generic_name.ilike.%${query}%`);
+    if (filterError) throw new Error("Unable to load search filters.", { cause: filterError });
+
+    const formCounts = new Map<string, number>();
+    const categoryCounts = new Map<string, number>();
+    for (const medicine of filterData ?? []) {
+      if (medicine.form) formCounts.set(medicine.form, (formCounts.get(medicine.form) ?? 0) + 1);
+      if (medicine.category) categoryCounts.set(medicine.category, (categoryCounts.get(medicine.category) ?? 0) + 1);
+    }
+    formOptions = Array.from(formCounts, ([label, count]) => ({ label, count }));
+    categoryOptions = Array.from(categoryCounts, ([label, count]) => ({ label, count }));
+
+    if (medicines.length > 0) {
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from("inventory")
+        .select("medicine_id, pharmacy_id, quantity, low_stock_threshold, expiry_date, pharmacies!inner(id, status)")
+        .in("medicine_id", medicines.map((medicine) => medicine.id))
+        .eq("pharmacies.status", "approved");
+      if (inventoryError) throw new Error("Unable to load pharmacy availability.", { cause: inventoryError });
+
+      const grouped = new Map<string, Map<string, StockBatch[]>>();
+      for (const row of (inventoryData ?? []) as InventoryRow[]) {
+        const pharmacy = Array.isArray(row.pharmacies) ? row.pharmacies[0] : row.pharmacies;
+        if (!pharmacy) throw new Error("Inventory record is missing its pharmacy.");
+        const pharmacies = grouped.get(row.medicine_id) ?? new Map<string, StockBatch[]>();
+        pharmacies.set(row.pharmacy_id, [...(pharmacies.get(row.pharmacy_id) ?? []), row]);
+        grouped.set(row.medicine_id, pharmacies);
+      }
+
+      for (const medicine of medicines) {
+        const pharmacies = grouped.get(medicine.id) ?? new Map<string, StockBatch[]>();
+        const statuses = Array.from(pharmacies.values(), (batches) => getStockStatus(batches));
+        availability.set(medicine.id, {
+          pharmacyCount: statuses.length,
+          stockCount: statuses.filter((status) => status !== "out_of_stock").length,
+        });
+      }
+    }
   }
 
   return (
     <div className="min-h-screen bg-surface font-sans text-ink-900">
       <Navbar />
-      <main className="mx-auto w-full max-w-[1200px] px-6 py-12 lg:px-8">
-        <div className="mx-auto max-w-[780px]">
-          <h1 className="text-3xl font-bold tracking-[-0.035em] sm:text-4xl">Find your medicine</h1>
-          <p className="mt-3 text-ink-600">Search by brand or generic name to find medicine information.</p>
-          <div className="mt-8">
-            <SearchBar initialQuery={query} />
-          </div>
+      <main className="mx-auto w-full max-w-[1360px] px-6 pb-16 pt-10 lg:px-20">
+        <SearchBar initialQuery={query} />
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <h1 className="text-[22px] font-bold">Results for “{query || "your search"}”</h1>
+          <p className="text-sm font-medium text-ink-600">{medicines.length} medicines found</p>
         </div>
-
-        <section className="mt-12" aria-live="polite">
-          {medicines.length > 0 ? (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {medicines.map((medicine) => (
-                <Link
+        <div className="mt-4 flex items-center gap-2.5 rounded-[10px] bg-warning-50 px-4 py-3 text-[13px] font-medium text-warning-600">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-warning-600 text-xs font-bold text-background">!</span>
+          <span>Availability may be outdated. Please confirm with the pharmacy before traveling or picking up.</span>
+        </div>
+        <div className="mt-6 flex flex-col items-start gap-8 lg:flex-row">
+          <FilterSidebar query={query} formOptions={formOptions} categoryOptions={categoryOptions} selectedForm={selectedForm} selectedCategory={selectedCategory} />
+          <section className="flex min-w-0 flex-1 flex-col gap-4" aria-live="polite">
+            {medicines.length > 0 ? medicines.map((medicine) => {
+              const summary = availability.get(medicine.id) ?? { pharmacyCount: 0, stockCount: 0 };
+              return (
+                <MedicineCard
                   key={medicine.id}
-                  href={`/medicines/${medicine.id}`}
-                  className="rounded-2xl border border-line bg-white p-6 transition-shadow hover:shadow-md"
-                >
-                  <p className="text-sm font-semibold text-primary-600">{medicine.category ?? "Medicine"}</p>
-                  <h2 className="mt-3 text-xl font-bold">{medicine.brand_name}</h2>
-                  <p className="mt-1 text-ink-600">{medicine.generic_name}</p>
-                  <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 text-sm">
-                    <div>
-                      <dt className="text-ink-400">Strength</dt>
-                      <dd className="mt-1 font-medium text-ink-900">{medicine.strength ?? "—"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-ink-400">Form</dt>
-                      <dd className="mt-1 font-medium text-ink-900">{medicine.form ?? "—"}</dd>
-                    </div>
-                  </dl>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-line bg-white px-6 py-12 text-center">
-              <h2 className="text-xl font-bold">No medicines found</h2>
-              <p className="mt-2 text-ink-600">Try searching with a different brand or generic name.</p>
-            </div>
-          )}
-        </section>
-
-        <p className="mt-8 text-center text-sm text-ink-600">
-          Availability may be outdated. Confirm with the pharmacy before visiting.
-        </p>
+                  id={medicine.id}
+                  brandName={medicine.brand_name}
+                  genericName={medicine.generic_name}
+                  strength={medicine.strength}
+                  form={medicine.form}
+                  category={medicine.category}
+                  {...summary}
+                />
+              );
+            }) : (
+              <div className="rounded-[14px] border border-line bg-background px-6 py-12 text-center">
+                <h2 className="text-xl font-bold">No medicines found</h2>
+                <p className="mt-2 text-ink-600">{query ? "Try searching with a different name or filter." : "Search by brand or generic name to find medicine information."}</p>
+              </div>
+            )}
+            {medicines.length > 0 ? <p className="text-[13px] text-ink-400">Can&apos;t find your medicine? Try the generic name or check the spelling.</p> : null}
+          </section>
+        </div>
       </main>
       <Footer />
     </div>
