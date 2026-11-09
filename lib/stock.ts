@@ -31,3 +31,9 @@ export function getStockStatus(batches: StockBatch[]): StockStatus {
 
   return totalQuantity <= largestThreshold ? "low_stock" : "in_stock";
 }
+export function getTotalQuantity(batches: StockBatch[]): number {
+  const today = new Date().toISOString().slice(0, 10);
+  return batches
+    .filter((b) => !b.expiry_date || b.expiry_date >= today)
+    .reduce((sum, b) => sum + b.quantity, 0);
+}
