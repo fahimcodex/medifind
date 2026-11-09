@@ -1,5 +1,5 @@
-import { PharmacyResults, type PharmacyResult } from "@/components/medicines/PharmacyResults";
-import { PharmacyMap } from "@/components/map/PharmacyMap";
+import { PharmacyAvailability } from "@/components/medicines/PharmacyAvailability";
+import type { PharmacyResult } from "@/components/medicines/PharmacyResults";
 import { Footer } from "@/components/landing/Footer";
 import { Navbar } from "@/components/landing/Navbar";
 import { getStockStatus, type StockBatch } from "@/lib/stock";
@@ -81,7 +81,8 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
     await Promise.all([
       supabase
         .from("inventory")
-        .select("*, pharmacies(*)")
+        .select("*, pharmacies!inner(*)")
+        .eq("pharmacies.status", "approved")
         .eq("medicine_id", medicine.id),
       alternativesQuery,
     ]);
@@ -124,53 +125,73 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
   return (
     <div className="min-h-screen bg-surface font-sans text-ink-900">
       <Navbar />
-      <main className="mx-auto w-full max-w-[1200px] px-6 py-12 lg:px-8">
-        <Link href="/search" className="text-sm font-semibold text-primary-600 hover:text-primary-700">
-          ← Back to search
-        </Link>
+      <main className="mx-auto w-full max-w-[1200px] px-6 py-8 lg:px-20">
+        <div className="flex items-center gap-2 text-[13px]">
+          <Link href="/search" className="font-semibold text-primary-600 hover:text-primary-700">
+            Search results
+          </Link>
+          <span className="text-ink-400">›</span>
+          <span className="font-medium text-ink-600">
+            {medicine.brand_name} {medicine.strength ?? ""}
+          </span>
+        </div>
 
-        <section className="mt-8 rounded-2xl border border-line bg-background p-6 sm:p-8">
-          <p className="text-sm font-semibold text-primary-600">{medicine.category ?? "Medicine"}</p>
-          <h1 className="mt-3 text-3xl font-bold tracking-[-0.035em] sm:text-4xl">{medicine.brand_name}</h1>
-          <p className="mt-2 text-lg text-ink-600">{medicine.generic_name}</p>
-          <dl className="mt-6 grid max-w-md grid-cols-2 gap-5 border-t border-line pt-5 text-sm">
-            <div>
-              <dt className="text-ink-400">Strength</dt>
-              <dd className="mt-1 font-semibold">{medicine.strength ?? "—"}</dd>
+        <section className="mt-5 flex flex-col justify-between gap-6 rounded-2xl border border-line bg-background p-7 sm:flex-row sm:items-center">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-[30px] font-bold tracking-[-0.035em]">{medicine.brand_name}</h1>
+              {medicine.strength ? (
+                <span className="rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-ink-600">
+                  {medicine.strength}
+                </span>
+              ) : null}
             </div>
-            <div>
-              <dt className="text-ink-400">Form</dt>
-              <dd className="mt-1 font-semibold">{medicine.form ?? "—"}</dd>
+            <p className="mt-2 text-base font-medium text-ink-600">Generic: {medicine.generic_name}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {medicine.form ? (
+                <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-600">
+                  {medicine.form}
+                </span>
+              ) : null}
+              {medicine.category ? (
+                <span className="rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-ink-600">
+                  {medicine.category}
+                </span>
+              ) : null}
             </div>
-          </dl>
-          {medicine.description ? <p className="mt-6 max-w-2xl text-ink-600">{medicine.description}</p> : null}
+            {medicine.description ? <p className="mt-2 text-sm text-ink-600">{medicine.description}</p> : null}
+          </div>
         </section>
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:items-start">
-          <PharmacyResults pharmacies={pharmacies} />
-          <aside className="lg:sticky lg:top-6" aria-label="Pharmacy map">
-            <PharmacyMap pharmacies={pharmacies} />
-          </aside>
+        <div className="mt-4 rounded-[10px] bg-warning-50 px-4 py-3 text-[13px] font-medium text-warning-600">
+          <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full bg-warning-600 font-bold text-white">!</span>
+          Availability may be outdated. Please confirm with the pharmacy before traveling or picking up.
         </div>
+
+        <PharmacyAvailability pharmacies={pharmacies} />
 
         {(alternativesData ?? []).length > 0 ? (
           <section className="mt-14" aria-labelledby="alternatives-heading">
             <h2 id="alternatives-heading" className="text-2xl font-bold tracking-[-0.03em]">
               Alternative brands
             </h2>
-            <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <p className="mt-2 text-sm text-ink-600">
+              Same generic ({medicine.generic_name}), strength ({medicine.strength ?? "—"}) and form ({medicine.form ?? "—"}). Information only, not a recommendation.
+            </p>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {(alternativesData as Medicine[]).map((alternative) => (
                 <Link
                   key={alternative.id}
                   href={`/medicines/${alternative.id}`}
-                  className="rounded-2xl border border-line bg-background p-6 transition-shadow hover:shadow-md"
+                  className="flex items-center justify-between rounded-xl border border-line bg-background px-4 py-4 transition-shadow hover:shadow-md"
                 >
-                  <p className="text-sm font-semibold text-primary-600">{alternative.category ?? "Medicine"}</p>
-                  <h3 className="mt-3 text-xl font-bold">{alternative.brand_name}</h3>
-                  <p className="mt-1 text-ink-600">{alternative.generic_name}</p>
-                  <p className="mt-4 text-sm text-ink-600">
-                    {alternative.strength ?? "—"} · {alternative.form ?? "—"}
-                  </p>
+                  <div>
+                    <h3 className="text-sm font-semibold">{alternative.brand_name}</h3>
+                    <p className="mt-1 text-xs text-ink-600">
+                      {alternative.generic_name} {alternative.strength ?? "—"} · {alternative.form ?? "—"}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-primary-600">View availability →</span>
                 </Link>
               ))}
             </div>

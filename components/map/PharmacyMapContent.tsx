@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type PharmacyMapContentProps = {
   pharmacies: PharmacyResult[];
+  selectedPharmacyId: string | null;
 };
 
 const defaultLocation = { latitude: 23.7806, longitude: 90.4075 };
@@ -24,18 +25,21 @@ const markerColors = {
   out_of_stock: "#B42318",
 } as const;
 
-function createDotIcon(color: string) {
+function createDotIcon(color: string, selected = false) {
   return L.divIcon({
     className: "",
-    html: `<span style="display:block;width:16px;height:16px;border-radius:9999px;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(16,24,40,.35)"></span>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    html: `<span style="display:block;width:${selected ? 22 : 16}px;height:${selected ? 22 : 16}px;border-radius:9999px;background:${color};border:2px solid white;box-shadow:0 0 0 ${selected ? 4 : 1}px ${selected ? "rgba(29,111,224,.35)" : "rgba(16,24,40,.35)"}"></span>`,
+    iconSize: [selected ? 22 : 16, selected ? 22 : 16],
+    iconAnchor: [selected ? 11 : 8, selected ? 11 : 8],
   });
 }
 
 const userIcon = createDotIcon("#1D6FE0");
 
-export default function PharmacyMapContent({ pharmacies }: PharmacyMapContentProps) {
+export default function PharmacyMapContent({
+  pharmacies,
+  selectedPharmacyId,
+}: PharmacyMapContentProps) {
   const [location, setLocation] = useState(defaultLocation);
 
   useEffect(() => {
@@ -65,7 +69,7 @@ export default function PharmacyMapContent({ pharmacies }: PharmacyMapContentPro
         center={[location.latitude, location.longitude]}
         zoom={12}
         scrollWheelZoom
-        className="h-[480px] w-full"
+        className="h-[700px] w-full"
       >
         <TileLayer
           attribution="© OpenStreetMap contributors"
@@ -86,7 +90,10 @@ export default function PharmacyMapContent({ pharmacies }: PharmacyMapContentPro
             <Marker
               key={pharmacy.id}
               position={[pharmacy.latitude!, pharmacy.longitude!]}
-              icon={createDotIcon(markerColors[pharmacy.status])}
+              icon={createDotIcon(
+                markerColors[pharmacy.status],
+                pharmacy.id === selectedPharmacyId,
+              )}
             >
               <Popup>
                 <strong>{pharmacy.name}</strong>

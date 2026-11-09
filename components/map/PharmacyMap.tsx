@@ -6,12 +6,18 @@ import "leaflet/dist/leaflet.css";
 
 type PharmacyMapProps = {
   pharmacies: PharmacyResult[];
+  selectedPharmacyId: string | null;
 };
 
 const PharmacyMapContent = dynamic(() => import("./PharmacyMapContent"), {
   ssr: false,
 });
 
-export function PharmacyMap({ pharmacies }: PharmacyMapProps) {
-  return <PharmacyMapContent pharmacies={pharmacies} />;
+export function PharmacyMap({ pharmacies, selectedPharmacyId }: PharmacyMapProps) {
+  return (
+    <PharmacyMapContent
+      pharmacies={pharmacies}
+      selectedPharmacyId={selectedPharmacyId}
+    />
+  );
 }

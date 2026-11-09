@@ -18,13 +18,19 @@ export type PharmacyResult = {
 
 type PharmacyResultsProps = {
   pharmacies: PharmacyResult[];
+  selectedPharmacyId: string | null;
+  onSelectPharmacy: (pharmacyId: string) => void;
 };
 
 const defaultLocation = { latitude: 23.7806, longitude: 90.4075 };
 
-export function PharmacyResults({ pharmacies }: PharmacyResultsProps) {
+export function PharmacyResults({
+  pharmacies,
+  selectedPharmacyId,
+  onSelectPharmacy,
+}: PharmacyResultsProps) {
   const [location, setLocation] = useState(defaultLocation);
-  const [usingDefaultLocation, setUsingDefaultLocation] = useState(false);
+  const [usingDefaultLocation, setUsingDefaultLocation] = useState(true);
   const [filter, setFilter] = useState<"all" | "in_stock">("all");
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export function PharmacyResults({ pharmacies }: PharmacyResultsProps) {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         });
+        setUsingDefaultLocation(false);
       },
       () => {
         setUsingDefaultLocation(true);
@@ -76,11 +83,6 @@ export function PharmacyResults({ pharmacies }: PharmacyResultsProps) {
           <h2 id="pharmacy-results-heading" className="text-2xl font-bold tracking-[-0.03em]">
             Pharmacy availability
           </h2>
-          {usingDefaultLocation ? (
-            <p className="mt-2 text-sm text-ink-600">Using default location</p>
-          ) : (
-            <p className="mt-2 text-sm text-ink-600">Sorted by distance from you</p>
-          )}
         </div>
         <div className="flex gap-2" aria-label="Filter pharmacies">
           {[
@@ -103,46 +105,59 @@ export function PharmacyResults({ pharmacies }: PharmacyResultsProps) {
           ))}
         </div>
       </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <p className="text-ink-400">
+          {usingDefaultLocation ? "Using default location (Dhaka)" : "Using your current location"}
+        </p>
+        <p className="font-medium text-ink-600">Sorted by distance · nearest first</p>
+      </div>
 
       <div className="mt-6 grid gap-4">
         {sortedPharmacies.length > 0 ? (
-          sortedPharmacies.map(({ pharmacy, distance }) => (
+          sortedPharmacies.map(({ pharmacy, distance }, index) => (
             <article
               key={pharmacy.id}
-              className="rounded-2xl border border-line bg-background p-5 shadow-sm"
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectPharmacy(pharmacy.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectPharmacy(pharmacy.id);
+                }
+              }}
+              className={`cursor-pointer rounded-xl border bg-background px-4 py-4 transition-shadow ${
+                selectedPharmacyId === pharmacy.id
+                  ? "border-2 border-primary-600 shadow-md"
+                  : index === 0 && pharmacy.status !== "out_of_stock"
+                    ? "border-2 border-primary-600"
+                    : "border-line"
+              }`}
+              aria-pressed={selectedPharmacyId === pharmacy.id}
             >
-              <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-lg font-bold">{pharmacy.name}</h3>
-                    <StockBadge status={pharmacy.status} />
-                  </div>
-                  <p className="mt-2 text-sm text-ink-600">{pharmacy.address ?? "Address unavailable"}</p>
-                  <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-600">
-                    <div>
-                      <dt className="inline text-ink-400">Hours: </dt>
-                      <dd className="inline">{pharmacy.openingHours ?? "Hours unavailable"}</dd>
-                    </div>
-                    <div>
-                      <dt className="inline text-ink-400">Distance: </dt>
-                      <dd className="inline">
-                        {distance === null ? "Unavailable" : formatDistance(distance)}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="flex items-center justify-between gap-5 md:min-w-[180px] md:flex-col md:items-end">
-                  <p className="text-sm font-semibold text-ink-600">
-                    {pharmacy.quantity} available
-                  </p>
-                  <button
-                    type="button"
-                    disabled
-                    className="rounded-lg bg-line px-5 py-2.5 text-sm font-semibold text-ink-400"
-                  >
-                    Reserve
-                  </button>
-                </div>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold">{pharmacy.name}</h3>
+                <StockBadge status={pharmacy.status} />
+              </div>
+              <p className="mt-2 text-xs text-ink-600">
+                {pharmacy.address ?? "Address unavailable"} · {pharmacy.openingHours ?? "Hours unavailable"}
+              </p>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-ink-600">
+                  {distance === null ? "Distance unavailable" : `${formatDistance(distance)} away`} ·{" "}
+                  {pharmacy.status === "low_stock"
+                    ? `Only ${pharmacy.quantity} left`
+                    : pharmacy.status === "out_of_stock"
+                      ? "Unavailable"
+                      : `${pharmacy.quantity} in stock`}
+                </p>
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-lg bg-line px-4 py-2 text-xs font-semibold text-ink-400"
+                >
+                  Reserve
+                </button>
               </div>
             </article>
           ))
