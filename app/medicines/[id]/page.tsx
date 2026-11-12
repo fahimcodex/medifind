@@ -1,8 +1,8 @@
 import { PharmacyAvailability } from "@/components/medicines/PharmacyAvailability";
-import type { PharmacyResult } from "@/components/medicines/PharmacyResults";
+import type { PharmacyResult } from "@/components/medicine/PharmacyResults";
 import { Footer } from "@/components/landing/Footer";
 import { Navbar } from "@/components/landing/Navbar";
-import { getStockStatus, type StockBatch } from "@/lib/stock";
+import { getStockStatus, getTotalQuantity, type StockBatch } from "@/lib/stock";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -34,14 +34,6 @@ type InventoryRow = StockBatch & {
 type MedicinePageProps = {
   params: Promise<{ id: string }>;
 };
-
-function activeQuantity(batches: StockBatch[]) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  return batches
-    .filter((batch) => !batch.expiry_date || batch.expiry_date >= today)
-    .reduce((total, batch) => total + batch.quantity, 0);
-}
 
 export default async function MedicinePage({ params }: MedicinePageProps) {
   const { id } = await params;
@@ -118,7 +110,7 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
       latitude: pharmacy.latitude,
       longitude: pharmacy.longitude,
       status: getStockStatus(batches),
-      quantity: activeQuantity(batches),
+      quantity: getTotalQuantity(batches),
     }),
   );
 

@@ -18,16 +18,12 @@ export type PharmacyResult = {
 
 type PharmacyResultsProps = {
   pharmacies: PharmacyResult[];
-  selectedPharmacyId: string | null;
-  onSelectPharmacy: (pharmacyId: string) => void;
 };
 
 const defaultLocation = { latitude: 23.7806, longitude: 90.4075 };
 
 export function PharmacyResults({
   pharmacies,
-  selectedPharmacyId,
-  onSelectPharmacy,
 }: PharmacyResultsProps) {
   const [location, setLocation] = useState(defaultLocation);
   const [usingDefaultLocation, setUsingDefaultLocation] = useState(true);
@@ -117,23 +113,11 @@ export function PharmacyResults({
           sortedPharmacies.map(({ pharmacy, distance }, index) => (
             <article
               key={pharmacy.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectPharmacy(pharmacy.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelectPharmacy(pharmacy.id);
-                }
-              }}
-              className={`cursor-pointer rounded-xl border bg-background px-4 py-4 transition-shadow ${
-                selectedPharmacyId === pharmacy.id
+              className={`rounded-xl border bg-background px-4 py-4 transition-shadow ${
+                index === 0 && pharmacy.status !== "out_of_stock"
                   ? "border-2 border-primary-600 shadow-md"
-                  : index === 0 && pharmacy.status !== "out_of_stock"
-                    ? "border-2 border-primary-600"
-                    : "border-line"
+                  : "border-line"
               }`}
-              aria-pressed={selectedPharmacyId === pharmacy.id}
             >
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-base font-semibold">{pharmacy.name}</h3>

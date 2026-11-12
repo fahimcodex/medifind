@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { PharmacyResult } from "@/components/medicines/PharmacyResults";
+import type { PharmacyResult } from "@/components/medicine/PharmacyResults";
 import "leaflet/dist/leaflet.css";
 
 type PharmacyMapProps = {
