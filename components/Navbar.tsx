@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const links = [
@@ -42,13 +43,12 @@ function getInitials(name: string) {
 
 export async function Navbar() {
   const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw new Error("Unable to load the current user.", { cause: userError });
+  let user;
+  try {
+    user = await getCurrentUser(supabase);
+  } catch (error) {
+    throw new Error("Unable to load the current user.", { cause: error });
   }
-
-  const user = userData.user;
   let profile: Profile | null = null;
 
   if (user) {

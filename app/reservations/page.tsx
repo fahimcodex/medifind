@@ -1,4 +1,5 @@
 import { ReservationList, type ReservationItem } from "@/components/reservations/ReservationList";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -28,12 +29,8 @@ export default async function ReservationsPage({ searchParams }: ReservationsPag
   const { status: requestedStatus } = await searchParams;
   const activeTab = tabs.some((tab) => tab.key === requestedStatus) ? requestedStatus ?? "all" : "all";
   const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw new Error("Unable to load the current user.", { cause: userError });
-  }
-  if (!userData.user) redirect("/login");
+  const user = await getCurrentUser(supabase);
+  if (!user) redirect("/login");
 
   const { error: expiryError } = await supabase.rpc("expire_reservations");
   if (expiryError) {
@@ -43,7 +40,7 @@ export default async function ReservationsPage({ searchParams }: ReservationsPag
   const { data, error } = await supabase
     .from("reservations")
     .select("id, quantity, status, created_at, expires_at, medicines!inner(id, brand_name, strength), pharmacies!inner(id, name, address, latitude, longitude)")
-    .eq("patient_id", userData.user.id)
+    .eq("patient_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {

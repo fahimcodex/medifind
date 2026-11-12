@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export type InventoryInput = {
@@ -23,14 +24,13 @@ export async function saveInventory(input: InventoryInput) {
   }
 
   const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) return { error: userError.message };
-  if (!userData.user) return { error: "You must be signed in to manage inventory." };
+  const user = await getCurrentUser(supabase);
+  if (!user) return { error: "You must be signed in to manage inventory." };
 
   const { data: pharmacy, error: pharmacyError } = await supabase
     .from("pharmacies")
     .select("id")
-    .eq("owner_id", userData.user.id)
+    .eq("owner_id", user.id)
     .maybeSingle();
 
   if (pharmacyError) return { error: pharmacyError.message };

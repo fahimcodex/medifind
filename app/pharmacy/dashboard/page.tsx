@@ -1,6 +1,7 @@
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { StockModal } from "@/components/pharmacy/StockModal";
 import { updateReservationStatusFromForm } from "@/app/actions/reservations";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -62,12 +63,8 @@ function isExpiringSoon(date: string | null, today: string, thirtyDaysFromNow: s
 
 export default async function PharmacyDashboardPage() {
   const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw new Error("Unable to load the current user.", { cause: userError });
-  }
-  if (!userData.user) redirect("/login");
+  const user = await getCurrentUser(supabase);
+  if (!user) redirect("/login");
 
   const { error: expiryError } = await supabase.rpc("expire_reservations");
   if (expiryError) {
@@ -77,7 +74,7 @@ export default async function PharmacyDashboardPage() {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", userData.user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (profileError) {
@@ -88,7 +85,7 @@ export default async function PharmacyDashboardPage() {
   const { data: pharmacyData, error: pharmacyError } = await supabase
     .from("pharmacies")
     .select("id, name, address")
-    .eq("owner_id", userData.user.id)
+    .eq("owner_id", user.id)
     .maybeSingle();
 
   if (pharmacyError) {

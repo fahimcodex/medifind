@@ -1,6 +1,13 @@
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  const supabase = await createClient();
+  const user = await getCurrentUser(supabase);
+  if (!user) redirect("/login");
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-white font-sans text-ink-900">
       <div className="text-center">

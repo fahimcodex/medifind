@@ -1,6 +1,7 @@
 import { Footer } from "@/components/landing/Footer";
 import { ReserveForm } from "@/components/reserve/ReserveForm";
 import { getTotalQuantity, type StockBatch } from "@/lib/stock";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -30,13 +31,13 @@ export default async function ReservePage({ searchParams }: ReservePageProps) {
   if (!pharmacyId || !medicineId) notFound();
 
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const user = await getCurrentUser(supabase);
+  if (!user) redirect("/login");
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", userData.user.id)
+    .eq("id", user.id)
     .maybeSingle();
   if (profileError) throw new Error("Unable to load account details.", { cause: profileError });
 
