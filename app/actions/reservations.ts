@@ -39,3 +39,12 @@ export async function updateReservationStatus(id: string, status: string) {
 
   return { ok: true };
 }
+
+export async function updateReservationStatusFromForm(
+  id: string,
+  status: string,
+  _formData: FormData,
+) {
+  void _formData;
+  await updateReservationStatus(id, status);
+}
