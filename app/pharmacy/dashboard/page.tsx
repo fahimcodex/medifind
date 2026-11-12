@@ -1,15 +1,24 @@
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { StockModal } from "@/components/pharmacy/StockModal";
 import { updateReservationStatusFromForm } from "@/app/actions/reservations";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 type InventoryRow = {
   id: string;
+  medicine_id: string;
   quantity: number;
   low_stock_threshold: number;
   batch_no: string | null;
   expiry_date: string | null;
   medicines: { brand_name: string; strength: string | null } | { brand_name: string; strength: string | null }[] | null;
+};
+
+type MedicineOption = {
+  id: string;
+  brand_name: string;
+  generic_name: string;
+  strength: string | null;
 };
 
 type ReservationRow = {
@@ -98,11 +107,15 @@ export default async function PharmacyDashboardPage() {
     );
   }
 
-  const [{ data: inventoryData, error: inventoryError }, { data: reservationData, error: reservationError }] =
+  const [
+    { data: inventoryData, error: inventoryError },
+    { data: reservationData, error: reservationError },
+    { data: medicineData, error: medicineError },
+  ] =
     await Promise.all([
       supabase
         .from("inventory")
-        .select("id, quantity, low_stock_threshold, batch_no, expiry_date, medicines!inner(brand_name, strength)")
+        .select("id, medicine_id, quantity, low_stock_threshold, batch_no, expiry_date, medicines!inner(brand_name, strength)")
         .eq("pharmacy_id", pharmacy.id)
         .order("expiry_date", { ascending: true }),
       supabase
@@ -110,16 +123,21 @@ export default async function PharmacyDashboardPage() {
         .select("id, quantity, status, expires_at, created_at, updated_at, medicines!inner(brand_name, strength), profiles!inner(full_name)")
         .eq("pharmacy_id", pharmacy.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("medicines")
+        .select("id, brand_name, generic_name, strength")
+        .order("brand_name", { ascending: true }),
     ]);
 
-  if (inventoryError || reservationError) {
+  if (inventoryError || reservationError || medicineError) {
     throw new Error("Unable to load pharmacy dashboard data.", {
-      cause: inventoryError ?? reservationError,
+      cause: inventoryError ?? reservationError ?? medicineError,
     });
   }
 
   const inventory = (inventoryData ?? []) as InventoryRow[];
   const reservations = (reservationData ?? []) as ReservationRow[];
+  const medicines = (medicineData ?? []) as MedicineOption[];
   const now = new Date();
   const nowTimestamp = now.getTime();
   const today = now.toISOString().slice(0, 10);
@@ -184,7 +202,7 @@ export default async function PharmacyDashboardPage() {
               </div>
               <p className="mt-1 text-xs text-ink-600">{pharmacy.name} · {pharmacy.address ?? "Address unavailable"}</p>
             </div>
-            <button type="button" className="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700">+ Add stock</button>
+            <StockModal medicines={medicines} />
           </header>
 
           <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Pharmacy statistics">
@@ -274,7 +292,19 @@ export default async function PharmacyDashboardPage() {
                         <td className="py-3 pr-4 text-ink-600">{row.low_stock_threshold}</td>
                         <td className={`py-3 pr-4 ${expiring ? "font-semibold text-danger-600" : "text-ink-600"}`}>{formatExpiry(row.expiry_date)}</td>
                         <td className="py-3 pr-4"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${outOfStock ? "bg-danger-50 text-danger-600" : lowStock ? "bg-warning-50 text-warning-600" : "bg-success-50 text-success-600"}`}>{outOfStock ? "Out of stock" : lowStock ? "Low stock" : "In stock"}</span></td>
-                        <td className="py-3 font-semibold text-primary-600">Edit</td>
+                        <td className="py-3">
+                          <StockModal
+                            medicines={medicines}
+                            inventory={{
+                              id: row.id,
+                              medicine_id: row.medicine_id,
+                              quantity: row.quantity,
+                              low_stock_threshold: row.low_stock_threshold,
+                              batch_no: row.batch_no,
+                              expiry_date: row.expiry_date,
+                            }}
+                          />
+                        </td>
                       </tr>
                     );
                   })}
