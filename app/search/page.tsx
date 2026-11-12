@@ -30,6 +30,11 @@ function getParam(params: SearchPageProps["searchParams"] extends Promise<infer 
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
 }
 
+function getNameSearchFilter(query: string) {
+  const safeQuery = query.replace(/[(),]/g, " ").replace(/\\/g, "\\\\");
+  return `brand_name.ilike.%${safeQuery}%,generic_name.ilike.%${safeQuery}%`;
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const query = getParam(params, "q");
@@ -40,61 +45,59 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   let categoryOptions: { label: string; count: number }[] = [];
   const availability = new Map<string, { pharmacyCount: number; stockCount: number }>();
 
-  if (query) {
-    const supabase = await createClient();
-    let medicineQuery = supabase
-      .from("medicines")
-      .select("id, brand_name, generic_name, strength, form, category")
-      .or(`brand_name.ilike.%${query}%,generic_name.ilike.%${query}%`)
-      .order("brand_name");
+  const supabase = await createClient();
+  let medicineQuery = supabase
+    .from("medicines")
+    .select("id, brand_name, generic_name, strength, form, category")
+    .order("brand_name");
 
-    if (selectedForm) medicineQuery = medicineQuery.eq("form", selectedForm);
-    if (selectedCategory) medicineQuery = medicineQuery.eq("category", selectedCategory);
+  if (query) medicineQuery = medicineQuery.or(getNameSearchFilter(query));
+  if (selectedForm) medicineQuery = medicineQuery.eq("form", selectedForm);
+  if (selectedCategory) medicineQuery = medicineQuery.eq("category", selectedCategory);
 
-    const { data, error } = await medicineQuery;
-    if (error) throw new Error("Unable to search medicines.", { cause: error });
-    medicines = (data ?? []) as Medicine[];
+  const { data, error } = await medicineQuery;
+  if (error) throw new Error("Unable to search medicines.", { cause: error });
+  medicines = (data ?? []) as Medicine[];
 
-    const { data: filterData, error: filterError } = await supabase
-      .from("medicines")
-      .select("form, category")
-      .or(`brand_name.ilike.%${query}%,generic_name.ilike.%${query}%`);
-    if (filterError) throw new Error("Unable to load search filters.", { cause: filterError });
+  let filterQuery = supabase.from("medicines").select("form, category");
+  if (query) filterQuery = filterQuery.or(getNameSearchFilter(query));
 
-    const formCounts = new Map<string, number>();
-    const categoryCounts = new Map<string, number>();
-    for (const medicine of filterData ?? []) {
-      if (medicine.form) formCounts.set(medicine.form, (formCounts.get(medicine.form) ?? 0) + 1);
-      if (medicine.category) categoryCounts.set(medicine.category, (categoryCounts.get(medicine.category) ?? 0) + 1);
+  const { data: filterData, error: filterError } = await filterQuery;
+  if (filterError) throw new Error("Unable to load search filters.", { cause: filterError });
+
+  const formCounts = new Map<string, number>();
+  const categoryCounts = new Map<string, number>();
+  for (const medicine of filterData ?? []) {
+    if (medicine.form) formCounts.set(medicine.form, (formCounts.get(medicine.form) ?? 0) + 1);
+    if (medicine.category) categoryCounts.set(medicine.category, (categoryCounts.get(medicine.category) ?? 0) + 1);
+  }
+  formOptions = Array.from(formCounts, ([label, count]) => ({ label, count }));
+  categoryOptions = Array.from(categoryCounts, ([label, count]) => ({ label, count }));
+
+  if (medicines.length > 0) {
+    const { data: inventoryData, error: inventoryError } = await supabase
+      .from("inventory")
+      .select("medicine_id, pharmacy_id, quantity, low_stock_threshold, expiry_date, pharmacies!inner(id, status)")
+      .in("medicine_id", medicines.map((medicine) => medicine.id))
+      .eq("pharmacies.status", "approved");
+    if (inventoryError) throw new Error("Unable to load pharmacy availability.", { cause: inventoryError });
+
+    const grouped = new Map<string, Map<string, StockBatch[]>>();
+    for (const row of (inventoryData ?? []) as InventoryRow[]) {
+      const pharmacy = Array.isArray(row.pharmacies) ? row.pharmacies[0] : row.pharmacies;
+      if (!pharmacy) throw new Error("Inventory record is missing its pharmacy.");
+      const pharmacies = grouped.get(row.medicine_id) ?? new Map<string, StockBatch[]>();
+      pharmacies.set(row.pharmacy_id, [...(pharmacies.get(row.pharmacy_id) ?? []), row]);
+      grouped.set(row.medicine_id, pharmacies);
     }
-    formOptions = Array.from(formCounts, ([label, count]) => ({ label, count }));
-    categoryOptions = Array.from(categoryCounts, ([label, count]) => ({ label, count }));
 
-    if (medicines.length > 0) {
-      const { data: inventoryData, error: inventoryError } = await supabase
-        .from("inventory")
-        .select("medicine_id, pharmacy_id, quantity, low_stock_threshold, expiry_date, pharmacies!inner(id, status)")
-        .in("medicine_id", medicines.map((medicine) => medicine.id))
-        .eq("pharmacies.status", "approved");
-      if (inventoryError) throw new Error("Unable to load pharmacy availability.", { cause: inventoryError });
-
-      const grouped = new Map<string, Map<string, StockBatch[]>>();
-      for (const row of (inventoryData ?? []) as InventoryRow[]) {
-        const pharmacy = Array.isArray(row.pharmacies) ? row.pharmacies[0] : row.pharmacies;
-        if (!pharmacy) throw new Error("Inventory record is missing its pharmacy.");
-        const pharmacies = grouped.get(row.medicine_id) ?? new Map<string, StockBatch[]>();
-        pharmacies.set(row.pharmacy_id, [...(pharmacies.get(row.pharmacy_id) ?? []), row]);
-        grouped.set(row.medicine_id, pharmacies);
-      }
-
-      for (const medicine of medicines) {
-        const pharmacies = grouped.get(medicine.id) ?? new Map<string, StockBatch[]>();
-        const statuses = Array.from(pharmacies.values(), (batches) => getStockStatus(batches));
-        availability.set(medicine.id, {
-          pharmacyCount: statuses.length,
-          stockCount: statuses.filter((status) => status !== "out_of_stock").length,
-        });
-      }
+    for (const medicine of medicines) {
+      const pharmacies = grouped.get(medicine.id) ?? new Map<string, StockBatch[]>();
+      const statuses = Array.from(pharmacies.values(), (batches) => getStockStatus(batches));
+      availability.set(medicine.id, {
+        pharmacyCount: statuses.length,
+        stockCount: statuses.filter((status) => status !== "out_of_stock").length,
+      });
     }
   }
 
