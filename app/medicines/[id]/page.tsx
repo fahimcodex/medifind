@@ -160,7 +160,7 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
           Availability may be outdated. Please confirm with the pharmacy before traveling or picking up.
         </div>
 
-        <PharmacyAvailability pharmacies={pharmacies} />
+        <PharmacyAvailability pharmacies={pharmacies} medicineId={medicine.id} />
 
         {(alternativesData ?? []).length > 0 ? (
           <section className="mt-14" aria-labelledby="alternatives-heading">

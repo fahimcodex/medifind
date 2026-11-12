@@ -3,6 +3,7 @@
 import { formatDistance, haversineKm } from "@/lib/geo";
 import { StockBadge } from "@/components/search/StockBadge";
 import type { StockStatus } from "@/lib/stock";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 export type PharmacyResult = {
@@ -18,12 +19,14 @@ export type PharmacyResult = {
 
 type PharmacyResultsProps = {
   pharmacies: PharmacyResult[];
+  medicineId: string;
 };
 
 const defaultLocation = { latitude: 23.7806, longitude: 90.4075 };
 
 export function PharmacyResults({
   pharmacies,
+  medicineId,
 }: PharmacyResultsProps) {
   const [location, setLocation] = useState(defaultLocation);
   const [usingDefaultLocation, setUsingDefaultLocation] = useState(true);
@@ -135,13 +138,22 @@ export function PharmacyResults({
                       ? "Unavailable"
                       : `${pharmacy.quantity} in stock`}
                 </p>
-                <button
-                  type="button"
-                  disabled
-                  className="rounded-lg bg-line px-4 py-2 text-xs font-semibold text-ink-400"
-                >
-                  Reserve
-                </button>
+                {pharmacy.status === "out_of_stock" ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-lg bg-line px-4 py-2 text-xs font-semibold text-ink-400"
+                  >
+                    Reserve
+                  </button>
+                ) : (
+                  <Link
+                    href={`/reserve?pharmacy=${pharmacy.id}&medicine=${medicineId}`}
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-700"
+                  >
+                    Reserve
+                  </Link>
+                )}
               </div>
             </article>
           ))
