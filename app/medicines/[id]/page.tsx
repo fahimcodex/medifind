@@ -1,7 +1,6 @@
 import { PharmacyAvailability } from "@/components/medicines/PharmacyAvailability";
 import type { PharmacyResult } from "@/components/medicine/PharmacyResults";
 import { Footer } from "@/components/landing/Footer";
-import { Navbar } from "@/components/landing/Navbar";
 import { getStockStatus, getTotalQuantity, type StockBatch } from "@/lib/stock";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -116,7 +115,6 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
 
   return (
     <div className="min-h-screen bg-surface font-sans text-ink-900">
-      <Navbar />
       <main className="mx-auto w-full max-w-[1200px] px-6 py-8 lg:px-20">
         <div className="flex items-center gap-2 text-[13px]">
           <Link href="/search" className="font-semibold text-primary-600 hover:text-primary-700">

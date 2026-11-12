@@ -1,5 +1,4 @@
 import { Footer } from "@/components/landing/Footer";
-import { Navbar } from "@/components/landing/Navbar";
 import { FilterSidebar } from "@/components/search/FilterSidebar";
 import { MedicineCard } from "@/components/search/MedicineCard";
 import { SearchBar } from "@/components/search/SearchBar";
@@ -103,7 +102,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <div className="min-h-screen bg-surface font-sans text-ink-900">
-      <Navbar />
       <main className="mx-auto w-full max-w-[1360px] px-6 pb-16 pt-10 lg:px-20">
         <SearchBar initialQuery={query} />
         <div className="mt-6 flex items-center justify-between gap-4">
