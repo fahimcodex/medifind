@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 type InventoryRow = {
   id: string;
   medicine_id: string;

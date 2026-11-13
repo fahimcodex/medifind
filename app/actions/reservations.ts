@@ -20,6 +20,8 @@ export async function createReservation(
     return { error: error.message };
   }
 
+  revalidatePath("/pharmacy/dashboard");
+
   return { id: data };
 }
 
