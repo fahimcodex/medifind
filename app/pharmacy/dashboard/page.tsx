@@ -68,6 +68,7 @@ export default async function PharmacyDashboardPage() {
 
   const { error: expiryError } = await supabase.rpc("expire_reservations");
   if (expiryError) {
+    console.error("Failed to expire reservations.", expiryError);
     throw new Error("Unable to update reservation statuses.", { cause: expiryError });
   }
 
@@ -78,6 +79,7 @@ export default async function PharmacyDashboardPage() {
     .maybeSingle();
 
   if (profileError) {
+    console.error("Failed to load account profile.", profileError);
     throw new Error("Unable to load account details.", { cause: profileError });
   }
   if (profile?.role !== "pharmacy") redirect("/search");
@@ -86,9 +88,12 @@ export default async function PharmacyDashboardPage() {
     .from("pharmacies")
     .select("id, name, address")
     .eq("owner_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (pharmacyError) {
+    console.error("Failed to load pharmacy dashboard record.", pharmacyError);
     throw new Error("Unable to load your pharmacy.", { cause: pharmacyError });
   }
 
@@ -119,6 +124,7 @@ export default async function PharmacyDashboardPage() {
         .from("reservations")
         .select("id, quantity, status, expires_at, created_at, updated_at, medicines!inner(brand_name, strength), profiles!inner(full_name)")
         .eq("pharmacy_id", pharmacy.id)
+        .in("status", ["pending", "confirmed"])
         .order("created_at", { ascending: false }),
       supabase
         .from("medicines")
@@ -126,6 +132,15 @@ export default async function PharmacyDashboardPage() {
         .order("brand_name", { ascending: true }),
     ]);
 
+  if (inventoryError) {
+    console.error("Failed to load pharmacy inventory.", inventoryError);
+  }
+  if (reservationError) {
+    console.error("Failed to load pharmacy reservations.", reservationError);
+  }
+  if (medicineError) {
+    console.error("Failed to load medicine options.", medicineError);
+  }
   if (inventoryError || reservationError || medicineError) {
     throw new Error("Unable to load pharmacy dashboard data.", {
       cause: inventoryError ?? reservationError ?? medicineError,
