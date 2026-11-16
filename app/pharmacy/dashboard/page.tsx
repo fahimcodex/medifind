@@ -124,7 +124,7 @@ export default async function PharmacyDashboardPage() {
         .order("expiry_date", { ascending: true }),
       supabase
         .from("reservations")
-        .select("id, quantity, status, expires_at, created_at, updated_at, medicines!inner(brand_name, strength), profiles!inner(full_name)")
+        .select("id, quantity, status, expires_at, created_at, updated_at, medicines(brand_name, strength), profiles(full_name)")
         .eq("pharmacy_id", pharmacy.id)
         .in("status", ["pending", "confirmed"])
         .order("created_at", { ascending: false }),
