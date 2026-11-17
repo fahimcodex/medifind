@@ -3,6 +3,7 @@ import { StockModal } from "@/components/pharmacy/StockModal";
 import { updateReservationStatusFromForm } from "@/app/actions/reservations";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ type Pharmacy = {
   id: string;
   name: string;
   address: string | null;
+  status: "pending" | "approved" | "suspended";
 };
 
 function joinedValue<T>(value: T | T[] | null) {
@@ -88,7 +90,7 @@ export default async function PharmacyDashboardPage() {
 
   const { data: pharmacyData, error: pharmacyError } = await supabase
     .from("pharmacies")
-    .select("id, name, address")
+    .select("id, name, address, status")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -105,7 +107,10 @@ export default async function PharmacyDashboardPage() {
       <main className="flex min-h-screen items-center justify-center bg-surface px-6 font-sans text-ink-900">
         <section className="rounded-xl border border-line bg-background p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold">No pharmacy is linked to your account yet</h1>
-          <p className="mt-2 text-sm text-ink-600">Please contact an administrator to link your pharmacy.</p>
+          <p className="mt-2 text-sm text-ink-600">Set up your pharmacy to submit it for admin approval.</p>
+          <Link href="/pharmacy/setup" className="mt-5 inline-flex rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700">
+            Set up pharmacy
+          </Link>
         </section>
       </main>
     );
@@ -212,12 +217,24 @@ export default async function PharmacyDashboardPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight">Pharmacy dashboard</h1>
-                <span className="rounded-full bg-success-50 px-2.5 py-1 text-[11px] font-semibold text-success-600">Approved</span>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pharmacy.status === "approved" ? "bg-success-50 text-success-600" : pharmacy.status === "suspended" ? "bg-danger-50 text-danger-600" : "bg-warning-50 text-warning-600"}`}>
+                  {pharmacy.status[0].toUpperCase() + pharmacy.status.slice(1)}
+                </span>
               </div>
               <p className="mt-1 text-xs text-ink-600">{pharmacy.name} · {pharmacy.address ?? "Address unavailable"}</p>
             </div>
             <StockModal medicines={medicines} />
           </header>
+
+          {pharmacy.status === "pending" ? (
+            <div className="mt-5 rounded-xl border border-warning-600/20 bg-warning-50 px-4 py-3 text-sm font-medium text-warning-600" role="status">
+              Awaiting admin approval. Customers can’t see your pharmacy yet.
+            </div>
+          ) : pharmacy.status === "suspended" ? (
+            <div className="mt-5 rounded-xl border border-danger-600/20 bg-danger-50 px-4 py-3 text-sm font-medium text-danger-600" role="alert">
+              Your pharmacy is suspended. Customers can’t see your pharmacy.
+            </div>
+          ) : null}
 
           <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Pharmacy statistics">
             {[
